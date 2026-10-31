@@ -1,0 +1,65 @@
+name: Sync ORDS to MongoDB Atlas
+
+on:
+  schedule:
+    # يتم التحديث تلقائياً كل 15 دقيقة
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # يتيح لك إمكانية التشغيل اليدوي بنقرة زر من GitHub
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pymongo dnspython
+
+      - name: Run Sync Script
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+        run: |
+          python -c "
+          import os, requests
+          from pymongo import MongoClient
+
+          try:
+              mongo_uri = os.environ.get('MONGO_URI')
+              if not mongo_uri:
+                  raise Exception('MONGO_URI secret is missing!')
+
+              client = MongoClient(mongo_uri)
+              db = client['transport']
+              collection = db['bus_data']
+
+              # طلب بيانات ORDS
+              ords_url = 'http://197.3.5.106:9280/ords/ti/exploitation/AFFICHEUR_RAED'
+              response = requests.get(ords_url, timeout=15)
+              
+              if response.status_code == 200:
+                  data = response.json()
+                  items = data.get('items', data) if isinstance(data, dict) else data
+                  
+                  # تفريغ البيانات القديمة ثم إدخال المحدثة
+                  collection.delete_many({})
+                  if isinstance(items, list) and len(items) > 0:
+                      collection.insert_many(items)
+                      print(f'Sync success! Inserted {len(items)} records.')
+                  elif items:
+                      collection.insert_one(items)
+                      print('Sync success! Inserted 1 record.')
+                  else:
+                      print('No data found in ORDS response.')
+              else:
+                  print(f'ORDS Error code: {response.status_code}')
+          except Exception as e:
+              print(f'Execution Error: {e}')
+          "
