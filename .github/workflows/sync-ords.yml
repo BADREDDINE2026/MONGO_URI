@@ -1,14 +1,14 @@
-name: Sync ORDS to MongoDB Atlas
+name: Sync ORDS to MongoDB Atlas (Local Network)
 
 on:
   schedule:
     # يتم التحديث تلقائياً كل 15 دقيقة
     - cron: '*/15 * * * *'
-  workflow_dispatch: # يتيح لك إمكانية التشغيل اليدوي بنقرة زر من GitHub
+  workflow_dispatch: # يتيح التشغيل اليدوي متى شئت
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted  # استخدام السيرفر المحلي للوصول لشبكة Intranet
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,7 +40,7 @@ jobs:
               db = client['transport']
               collection = db['bus_data']
 
-              # طلب بيانات ORDS
+              # طلب بيانات ORDS عبر الشبكة الداخلية للشركه
               ords_url = 'http://197.3.5.106:9280/ords/ti/exploitation/AFFICHEUR_RAED'
               response = requests.get(ords_url, timeout=15)
               
